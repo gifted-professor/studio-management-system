@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Member {
+  id             Int       @id @default(autoincrement())
+  name           String
+  phone          String?   @unique
+  address        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  status         String @default("ACTIVE")
+  totalOrders    Int       @default(0)
+  totalAmount    Float     @default(0)
+  lastOrderDate  DateTime?
+  returnRate     Float?    @default(0)
+  
+  // 关联关系
+  orders         Order[]
+  followUps      FollowUp[]
+  
+  @@map("members")
+}
+
+model Order {
+  id                 Int       @id @default(autoincrement())
+  memberId           Int
+  orderNo            String?   @unique
+  paymentDate        DateTime?
+  platform           String?
+  responsiblePerson  String?
+  productName        String?
+  productCode        String?
+  manufacturer       String?
+  amount             Float?
+  costPrice          Float?
+  profit             Float?
+  profitRate         Float?
+  status             String @default("PENDING")
+  size               String?
+  color              String?
+  customerInfo       String?
+  shippingAddress    String?
+  courierCompany     String?
+  remarks            String?
+  refundResponsible  String?   // 退款负责人
+  refundDate         DateTime? // 退款日
+  refundAmount       Float?    // 退款金额
+  refundType         String?   // 退款类型
+  refundReason       String?   // 退款原因
+  returnTrackingNo   String?   // 退货单号
+  returnAddress      String?   // 退货地址
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  // 关联关系
+  member             Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  followUps          FollowUp[]
+  
+  @@map("orders")
+}
+
+model FollowUp {
+  id                Int       @id @default(autoincrement())
+  memberId          Int
+  orderId           Int?
+  followUpDate      DateTime  @default(now())
+  followUpType      String
+  content           String?
+  method            String
+  result            String?
+  nextFollowUpDate  DateTime?
+  operator          String?
+  createdAt         DateTime  @default(now())
+  
+  // 关联关系
+  member            Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  order             Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  
+  @@map("follow_ups")
+}
+
+// 枚举值现在使用字符串类型存储
+// MemberStatus: "ACTIVE", "INACTIVE"
+// OrderStatus: "PENDING", "PAID", "SHIPPED", "COMPLETED", "CANCELLED"
+// FollowUpType: "PAYMENT_REMINDER", "ORDER_INQUIRY", "RETURN_INQUIRY", "GENERAL"
+// ContactMethod: "PHONE", "WECHAT", "SMS", "EMAIL"
+// FollowUpResult: "NO_RESPONSE", "RESPONDED", "ORDER_UPDATED", "PAYMENT_MADE"
