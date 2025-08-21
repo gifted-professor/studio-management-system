@@ -112,10 +112,8 @@ export async function GET() {
           ? Math.floor((now.getTime() - member.lastOrderDate.getTime()) / (1000 * 60 * 60 * 24))
           : 999
         
-        const favoriteProducts = member.orders.map(o => o.productName).filter(Boolean).slice(0, 2)
-        const favoriteText = favoriteProducts.length > 0 
-          ? `，偏爱${favoriteProducts.join('、')}` 
-          : ''
+        // const favoriteProducts = member.orders.map(o => o.productName).filter(Boolean).slice(0, 2)
+        const favoriteText = '' // 暂时不显示偏好产品
 
         return {
           id: `dormant_${member.id}`,
