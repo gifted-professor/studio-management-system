@@ -358,6 +358,9 @@ export default function MemberDetailPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     退款原因
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    退回单号
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -441,6 +444,13 @@ export default function MemberDetailPage() {
                           退款日期: {formatDate(order.refundDate)}
                         </div>
                       )}
+                    </td>
+
+                    {/* 退回单号 */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {order.returnTrackingNo || "-"}
+                      </div>
                     </td>
                   </tr>
                 ))}

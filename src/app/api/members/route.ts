@@ -14,15 +14,16 @@ export async function GET(request: NextRequest) {
     const activityLevel = searchParams.get('activityLevel') || ''
     const daysSinceOrder = searchParams.get('daysSinceOrder') || ''
     const platform = searchParams.get('platform') || ''
+    const filter = searchParams.get('filter') || '' // 特殊筛选器
 
     // 生成缓存键
-    const cacheKey = `members:${page}:${limit}:${search}:${sortBy}:${sortOrder}:${activityLevel}:${daysSinceOrder}:${platform}`
+    const cacheKey = `members:${page}:${limit}:${search}:${sortBy}:${sortOrder}:${activityLevel}:${daysSinceOrder}:${platform}:${filter}`
     
     // 尝试从缓存获取数据（仅当没有搜索时缓存）
     if (!search) {
       const cachedData = memoryCache.get(cacheKey)
       if (cachedData) {
-        console.log('从缓存返回会员数据')
+        console.log(`从缓存返回会员数据，缓存键: ${cacheKey}`)
         return NextResponse.json(cachedData)
       }
     }
@@ -190,6 +191,64 @@ export async function GET(request: NextRequest) {
       })
     }
     
+    // 处理特殊筛选器
+    if (filter) {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      
+      if (filter === 'risk') {
+        // 流失风险会员：30-90天未复购
+        const thirtyDaysAgo = new Date(today)
+        const ninetyDaysAgo = new Date(today)
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+        andConditions.push({
+          lastOrderDate: {
+            gte: ninetyDaysAgo,
+            lt: thirtyDaysAgo,
+            not: null
+          }
+        })
+      } else if (filter === 'high_value_dormant') {
+        // 高价值沉睡会员：累计消费>=3000且90天以上未购买(必须有购买记录)
+        const ninetyDaysAgo = new Date(today)
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+        andConditions.push({
+          totalAmount: {
+            gte: 3000
+          },
+          lastOrderDate: {
+            lt: ninetyDaysAgo,
+            not: null
+          }
+        })
+      } else if (filter === 'birthday') {
+        // 近期生日会员（30天内生日）
+        // 注意：这里假设生日存储在某个字段中，实际需要根据数据库结构调整
+        // 暂时使用创建时间月份来模拟
+        const currentMonth = now.getMonth()
+        const nextMonth = (currentMonth + 1) % 12
+        andConditions.push({
+          // 这里需要根据实际的生日字段来调整
+          // 暂时用创建时间月份代替
+          OR: [
+            {
+              createdAt: {
+                gte: new Date(now.getFullYear(), currentMonth, 1),
+                lt: new Date(now.getFullYear(), currentMonth + 1, 1)
+              }
+            },
+            {
+              createdAt: {
+                gte: new Date(now.getFullYear(), nextMonth, 1),
+                lt: new Date(now.getFullYear(), nextMonth + 1, 1)
+              }
+            }
+          ]
+        })
+      }
+    }
+    
     // 如果有AND条件，将它们合并到where子句中
     if (andConditions.length > 0) {
       where.AND = andConditions
@@ -260,6 +319,7 @@ export async function GET(request: NextRequest) {
 
     // 缓存响应数据（仅当没有搜索时缓存）
     if (!search) {
+      console.log(`缓存会员数据，缓存键: ${cacheKey}，总数: ${response.pagination.total}`)
       memoryCache.set(cacheKey, response, 2 * 60 * 1000) // 缓存2分钟
     }
 

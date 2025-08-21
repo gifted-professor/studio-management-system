@@ -57,21 +57,26 @@ export default function Sidebar() {
               key={item.name}
               href={item.href}
               className={`
-                group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200
+                group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 relative
                 ${
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary border-2 border-primary/30 shadow-lg font-semibold"
+                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-primary/5 border-2 border-transparent"
                 }
               `}
             >
+              {/* 激活状态的左侧指示条 */}
+              {isActive && (
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"></div>
+              )}
+              
               <item.icon
                 className={`
                   mr-3 h-5 w-5 transition-colors duration-200
                   ${
                     isActive
-                      ? "text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground/70"
+                      ? "text-primary"
+                      : "text-sidebar-foreground/50 group-hover:text-primary/70"
                   }
                 `}
               />
@@ -79,7 +84,9 @@ export default function Sidebar() {
 
               {/* 活跃状态指示器 */}
               {isActive && (
-                <div className="ml-auto w-2 h-2 bg-sidebar-primary rounded-full"></div>
+                <div className="ml-auto flex items-center">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                </div>
               )}
             </Link>
           );
@@ -90,9 +97,9 @@ export default function Sidebar() {
       <div className="p-4 border-t border-sidebar-border">
         <Link
           href="/settings"
-          className="group flex items-center px-4 py-3 text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-xl transition-all duration-200"
+          className="group flex items-center px-4 py-3 text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-primary/5 rounded-xl transition-all duration-200 border-2 border-transparent"
         >
-          <Settings className="mr-3 h-5 w-5 text-sidebar-foreground/50 group-hover:text-sidebar-foreground/70" />
+          <Settings className="mr-3 h-5 w-5 text-sidebar-foreground/50 group-hover:text-primary/70" />
           设置
         </Link>
 

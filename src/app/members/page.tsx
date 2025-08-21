@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { 
   Plus, 
@@ -16,7 +17,8 @@ import {
   Filter,
   ArrowUpDown,
   Star,
-  AlertTriangle
+  AlertTriangle,
+  Crown
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -24,6 +26,7 @@ import {
   ACTIVITY_LABELS,
   getActivityLevelColor,
 } from "@/lib/activity";
+import CustomSelect from "@/components/CustomSelect";
 
 interface Member {
   id: number;
@@ -67,6 +70,9 @@ export default function MembersPage() {
   const [platformFilter, setPlatformFilter] = useState<string>("");
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [specialFilter, setSpecialFilter] = useState<string>(""); // 用于特殊筛选器（风险、高价值沉睡等）
+  
+  const searchParams = useSearchParams();
 
   const fetchMembers = async (
     page = 1,
@@ -75,6 +81,7 @@ export default function MembersPage() {
     order = sortOrder,
     activity = activityFilter,
     platform = platformFilter,
+    special = specialFilter,
     append = false
   ) => {
     try {
@@ -94,6 +101,7 @@ export default function MembersPage() {
 
       if (activity) params.set("activityLevel", activity);
       if (platform) params.set("platform", platform);
+      if (special) params.set("filter", special);
 
       const response = await fetch(`/api/members?${params}`);
       if (!response.ok) {
@@ -124,31 +132,49 @@ export default function MembersPage() {
 
   const loadMore = useCallback(async () => {
     if (hasMore && !loadingMore) {
+      // 直接从URL获取最新的filter参数，避免竞态条件
+      const currentFilterParam = searchParams.get('filter') || '';
       const nextPage = currentPage + 1;
       setCurrentPage(nextPage);
-      await fetchMembers(nextPage, searchTerm, sortBy, sortOrder, activityFilter, platformFilter, true);
+      await fetchMembers(nextPage, searchTerm, sortBy, sortOrder, activityFilter, platformFilter, currentFilterParam, true);
     }
-  }, [currentPage, hasMore, loadingMore, searchTerm, sortBy, sortOrder, activityFilter, platformFilter]);
+  }, [currentPage, hasMore, loadingMore, searchTerm, sortBy, sortOrder, activityFilter, platformFilter, searchParams]);
+
+  // URL参数解析 - 在组件挂载时执行
+  useEffect(() => {
+    const filterParam = searchParams.get('filter');
+    if (filterParam) {
+      setSpecialFilter(filterParam);
+      
+      // 根据筛选类型设置相应的标题和说明
+      switch (filterParam) {
+        case 'risk':
+          // 可以在这里设置页面标题等
+          break;
+        case 'high_value_dormant':
+          break;
+        case 'birthday':
+          break;
+      }
+    } else {
+      // 当没有filter参数时，清除特殊筛选器
+      setSpecialFilter('');
+    }
+  }, [searchParams]);
 
   const resetAndFetch = useCallback(async () => {
+    // 直接从URL获取最新的filter参数，避免竞态条件
+    const currentFilterParam = searchParams.get('filter') || '';
     setCurrentPage(1);
     setMembers([]);
     setHasMore(true);
-    await fetchMembers(1, searchTerm, sortBy, sortOrder, activityFilter, platformFilter, false);
-  }, [searchTerm, sortBy, sortOrder, activityFilter, platformFilter]);
+    await fetchMembers(1, searchTerm, sortBy, sortOrder, activityFilter, platformFilter, currentFilterParam, false);
+  }, [searchTerm, sortBy, sortOrder, activityFilter, platformFilter, searchParams]);
 
   useEffect(() => {
     resetAndFetch();
   }, [resetAndFetch]);
 
-  const handleSortChange = (newSortBy: "lastOrderDate" | "totalOrders" | "totalAmount") => {
-    if (newSortBy === sortBy) {
-      setSortOrder(sortOrder === "desc" ? "asc" : "desc");
-    } else {
-      setSortBy(newSortBy);
-      setSortOrder("desc");
-    }
-  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,6 +254,42 @@ export default function MembersPage() {
     }
   };
 
+  // 获取特殊筛选器的标题和描述
+  const getFilterInfo = () => {
+    switch (specialFilter) {
+      case 'risk':
+        return {
+          title: '流失风险会员',
+          description: '30-90天未复购的会员，需要重点关注',
+          icon: <AlertTriangle className="h-6 w-6 text-chart-2" />,
+          badgeClass: 'bg-chart-2/10 text-chart-2 border-chart-2/30'
+        };
+      case 'high_value_dormant':
+        return {
+          title: '高价值沉睡会员',
+          description: '累计消费超过3000元但90天以上未购买的高价值客户',
+          icon: <Crown className="h-6 w-6 text-destructive" />,
+          badgeClass: 'bg-destructive/10 text-destructive border-destructive/30'
+        };
+      case 'birthday':
+        return {
+          title: '近期生日会员',
+          description: '30天内生日的会员，适合生日关怀',
+          icon: <Calendar className="h-6 w-6 text-chart-3" />,
+          badgeClass: 'bg-chart-3/10 text-chart-3 border-chart-3/30'
+        };
+      default:
+        return {
+          title: '会员管理',
+          description: '管理客户信息，跟踪订单记录和活跃度',
+          icon: <Users className="h-6 w-6 text-primary" />,
+          badgeClass: ''
+        };
+    }
+  };
+
+  const filterInfo = getFilterInfo();
+
   return (
     <div className="space-y-6">
       {/* 页面标题卡片 */}
@@ -235,12 +297,27 @@ export default function MembersPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-3">
-              <Users className="h-6 w-6 text-primary" />
-              会员管理
+              {filterInfo.icon}
+              {filterInfo.title}
+              {specialFilter && (
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${filterInfo.badgeClass}`}>
+                  专项筛选
+                </span>
+              )}
             </h1>
             <p className="text-muted-foreground">
-              管理客户信息，跟踪订单记录和活跃度
+              {filterInfo.description}
             </p>
+            {specialFilter && (
+              <div className="mt-2">
+                <Link
+                  href="/members"
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  ← 返回全部会员
+                </Link>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right text-sm text-muted-foreground">
@@ -285,103 +362,90 @@ export default function MembersPage() {
           </div>
         </form>
 
-        {/* 筛选和排序 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 活跃度筛选 */}
-          <div>
-            <label className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <Filter className="h-4 w-4 text-primary" />
-              活跃度筛选
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setActivityFilter("")}
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border ${
-                  activityFilter === ""
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-background text-foreground border-border hover:bg-muted/50"
-                }`}
-              >
-                全部会员
-              </button>
-              {(['ACTIVE', 'SLIGHTLY_INACTIVE', 'HEAVILY_INACTIVE'] as ActivityLevel[]).map((level) => (
-                <button
-                  key={level}
-                  onClick={() => setActivityFilter(level)}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border ${
-                    activityFilter === level
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-background text-foreground border-border hover:bg-muted/50"
-                  }`}
-                >
-                  {ACTIVITY_LABELS[level]}
-                </button>
-              ))}
-            </div>
+        {/* 筛选条件 */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              筛选条件
+            </h3>
+            <button
+              onClick={() => {
+                setActivityFilter('');
+                setPlatformFilter('');
+                setSortBy('totalOrders');
+                setSortOrder('desc');
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              重置筛选
+            </button>
           </div>
-
-          {/* 平台筛选 */}
-          <div>
-            <label className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              出售平台
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setPlatformFilter("")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                  platformFilter === ""
-                    ? "bg-accent text-accent-foreground border-accent"
-                    : "bg-background text-foreground border-border hover:bg-muted/50"
-                }`}
-              >
-                全部
-              </button>
-              {availablePlatforms.map((platform) => (
-                <button
-                  key={platform}
-                  onClick={() => setPlatformFilter(platform)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                    platformFilter === platform
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-background text-foreground border-border hover:bg-muted/50"
-                  }`}
-                >
-                  {platform}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 排序选项 */}
-          <div>
-            <label className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4 text-primary" />
-              排序方式
-            </label>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 活跃度筛选 */}
             <div className="space-y-2">
-              {([
-                { key: 'totalOrders' as const, label: '订单数量' },
-                { key: 'totalAmount' as const, label: '消费金额' },
-                { key: 'lastOrderDate' as const, label: '最后下单' }
-              ]).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => handleSortChange(key)}
-                  className={`w-full px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border flex items-center justify-between ${
-                    sortBy === key
-                      ? "bg-secondary text-secondary-foreground border-secondary shadow-sm"
-                      : "bg-background text-foreground border-border hover:bg-muted/50"
-                  }`}
-                >
-                  <span>{label}</span>
-                  {sortBy === key && (
-                    <span className="text-sm">
-                      {sortOrder === "desc" ? "↓" : "↑"}
-                    </span>
-                  )}
-                </button>
-              ))}
+              <label className="text-sm font-medium text-foreground">活跃度筛选</label>
+              <CustomSelect
+                value={activityFilter}
+                onChange={(value) => setActivityFilter(value as ActivityLevel | "")}
+                placeholder="全部活跃度"
+                options={[
+                  { value: "", label: "全部活跃度", icon: "🌟" },
+                  { value: "HIGHLY_ACTIVE", label: "高度活跃", icon: "⭐" },
+                  { value: "ACTIVE", label: "活跃", icon: "📈" },
+                  { value: "SLIGHTLY_INACTIVE", label: "轻度不活跃", icon: "⚠️" },
+                  { value: "MODERATELY_INACTIVE", label: "中度不活跃", icon: "📉" },
+                  { value: "HEAVILY_INACTIVE", label: "重度不活跃", icon: "🔴" },
+                  { value: "DEEPLY_INACTIVE", label: "深度不活跃", icon: "⏰" },
+                ]}
+              />
+            </div>
+
+            {/* 平台筛选 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">销售平台</label>
+              <CustomSelect
+                value={platformFilter}
+                onChange={setPlatformFilter}
+                placeholder="全部平台"
+                options={[
+                  { value: "", label: "全部平台", icon: "🌐" },
+                  ...availablePlatforms.map((platform) => ({
+                    value: platform,
+                    label: platform,
+                    icon: "🛍️"
+                  }))
+                ]}
+              />
+            </div>
+
+            {/* 排序方式 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">排序方式</label>
+              <CustomSelect
+                value={sortBy}
+                onChange={(value) => setSortBy(value as "lastOrderDate" | "totalOrders" | "totalAmount")}
+                options={[
+                  { value: "totalOrders", label: "按订单数量", icon: "📊" },
+                  { value: "totalAmount", label: "按消费金额", icon: "💰" },
+                  { value: "lastOrderDate", label: "按最后下单时间", icon: "📅" },
+                ]}
+              />
+            </div>
+
+            {/* 排序顺序 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">排序顺序</label>
+              <button
+                onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                className="w-full px-4 py-3 border border-border rounded-xl text-sm bg-card hover:bg-muted/30 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-background transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-2 group"
+              >
+                <ArrowUpDown className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                <span className="font-medium">
+                  {sortOrder === "desc" ? "📉 降序" : "📈 升序"}
+                </span>
+              </button>
             </div>
           </div>
         </div>
