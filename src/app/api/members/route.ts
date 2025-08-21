@@ -5,6 +5,12 @@ import { memoryCache } from '@/lib/cache'
 // 获取所有会员
 export async function GET(request: NextRequest) {
   try {
+    // 添加调试信息
+    console.log('环境变量检查:', {
+      hasDbUrl: !!process.env.DATABASE_URL,
+      hasDirectUrl: !!process.env.DIRECT_DATABASE_URL,
+      dbUrl: process.env.DATABASE_URL?.substring(0, 50) + '...'
+    })
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
@@ -330,7 +336,12 @@ export async function GET(request: NextRequest) {
       { 
         error: '获取会员列表失败',
         details: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        debug: {
+          hasDbUrl: !!process.env.DATABASE_URL,
+          hasDirectUrl: !!process.env.DIRECT_DATABASE_URL,
+          errorType: error?.constructor.name
+        }
       },
       { status: 500 }
     )
