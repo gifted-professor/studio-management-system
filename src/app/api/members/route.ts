@@ -337,11 +337,10 @@ export async function GET(request: NextRequest) {
         error: '获取会员列表失败',
         details: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
-        debug: {
-          hasDbUrl: !!process.env.DATABASE_URL,
-          hasDirectUrl: !!process.env.DIRECT_DATABASE_URL,
-          errorType: error?.constructor.name
-        }
+        hasDbUrl: !!process.env.DATABASE_URL,
+        hasDirectUrl: !!process.env.DIRECT_DATABASE_URL,
+        dbUrl: process.env.DATABASE_URL?.substring(0, 70) + '...',
+        errorType: error?.constructor.name
       },
       { status: 500 }
     )
