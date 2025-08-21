@@ -3,27 +3,28 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model Member {
-  id            Int            @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   name          String
-  phone         String?        @unique
+  phone         String?   @unique
   address       String?
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  status        String         @default("ACTIVE")
-  activityLevel String         @default("ACTIVE") @map("activity_level")
-  totalOrders   Int            @default(0) @map("total_orders")
-  totalAmount   Float          @default(0) @map("total_amount")
-  lastOrderDate DateTime?      @map("last_order_date")
-  returnRate    Float?         @default(0) @map("return_rate")
-  aiSuggestions AISuggestion[]
-  followUps     FollowUp[]
+  status        String    @default("ACTIVE")
+  activityLevel String    @default("ACTIVE") @map("activity_level")
+  totalOrders   Int       @default(0) @map("total_orders")
+  totalAmount   Float     @default(0) @map("total_amount")
+  lastOrderDate DateTime? @map("last_order_date")
+  returnRate    Float?    @default(0) @map("return_rate")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
   orders        Order[]
+  followUps     FollowUp[]
+  aiSuggestions AISuggestion[]
 
   @@index([totalOrders, createdAt])
   @@index([totalAmount, createdAt])
@@ -63,8 +64,9 @@ model Order {
   refundType        String?    @map("refund_type")
   returnAddress     String?    @map("return_address")
   returnTrackingNo  String?    @map("return_tracking_no")
-  followUps         FollowUp[]
+  
   member            Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  followUps         FollowUp[]
 
   @@map("orders")
 }
@@ -81,8 +83,9 @@ model FollowUp {
   nextFollowUpDate DateTime? @map("next_follow_up_date")
   operator         String?
   createdAt        DateTime  @default(now()) @map("created_at")
-  order            Order?    @relation(fields: [orderId], references: [id])
+  
   member           Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  order            Order?    @relation(fields: [orderId], references: [id])
 
   @@map("follow_ups")
 }
@@ -102,6 +105,7 @@ model AISuggestion {
   isActive        Boolean  @default(true) @map("is_active")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
+  
   member          Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@index([memberId, isActive])
