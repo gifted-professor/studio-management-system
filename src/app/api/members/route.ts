@@ -327,7 +327,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('获取会员列表失败:', error)
     return NextResponse.json(
-      { error: '获取会员列表失败' },
+      { 
+        error: '获取会员列表失败',
+        details: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     )
   }
