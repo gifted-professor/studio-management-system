@@ -9,105 +9,87 @@ datasource db {
 }
 
 model Member {
-  id            Int       @id @default(autoincrement())
-  name          String
-  phone         String?   @unique
+  id            BigInt    @id @unique
+  name          String?
+  phone         BigInt?
   address       String?
-  status        String    @default("ACTIVE")
-  activityLevel String    @default("ACTIVE") @map("activity_level")
-  totalOrders   Int       @default(0) @map("total_orders")
-  totalAmount   Float     @default(0) @map("total_amount")
-  lastOrderDate DateTime? @map("last_order_date")
-  returnRate    Float?    @default(0) @map("return_rate")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  
-  orders        Order[]
-  followUps     FollowUp[]
-  aiSuggestions AISuggestion[]
+  status        String?
+  activityLevel String?   @map("activity_level")
+  totalOrders   BigInt?   @map("total_orders")
+  totalAmount   BigInt?   @map("total_amount")
+  lastOrderDate DateTime? @map("last_order_date") @db.Timestamptz(6)
+  returnRate    String?   @map("return_rate")
+  createdAt     DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([totalOrders, createdAt])
-  @@index([totalAmount, createdAt])
-  @@index([lastOrderDate, createdAt])
-  @@index([activityLevel])
-  @@index([name])
   @@map("members")
 }
 
 model Order {
-  id                Int        @id @default(autoincrement())
-  memberId          Int        @map("member_id")
-  orderNo           String?    @unique @map("order_no")
-  paymentDate       DateTime?  @map("payment_date")
+  id                BigInt    @id @unique
+  memberId          BigInt?   @map("member_id")
+  orderNo           String?   @map("order_no")
+  paymentDate       DateTime? @map("payment_date") @db.Timestamptz(6)
   platform          String?
-  responsiblePerson String?    @map("responsible_person")
-  productName       String?    @map("product_name")
-  productCode       String?    @map("product_code")
+  responsiblePerson String?   @map("responsible_person")
+  productName       String?   @map("product_name")
+  productCode       String?   @map("product_code")
   manufacturer      String?
   amount            Float?
-  costPrice         Float?     @map("cost_price")
+  costPrice         BigInt?   @map("cost_price")
   profit            Float?
-  profitRate        Float?     @map("profit_rate")
-  status            String     @default("PENDING")
+  profitRate        Float?    @map("profit_rate")
+  status            String?
   size              String?
   color             String?
-  customerInfo      String?    @map("customer_info")
-  shippingAddress   String?    @map("shipping_address")
-  courierCompany    String?    @map("courier_company")
+  customerInfo      String?   @map("customer_info")
+  shippingAddress   String?   @map("shipping_address")
+  courierCompany    String?   @map("courier_company")
   remarks           String?
-  createdAt         DateTime   @default(now()) @map("created_at")
-  updatedAt         DateTime   @updatedAt @map("updated_at")
-  refundAmount      Float?     @map("refund_amount")
-  refundDate        DateTime?  @map("refund_date")
-  refundReason      String?    @map("refund_reason")
-  refundResponsible String?    @map("refund_responsible")
-  refundType        String?    @map("refund_type")
-  returnAddress     String?    @map("return_address")
-  returnTrackingNo  String?    @map("return_tracking_no")
-  
-  member            Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  followUps         FollowUp[]
+  createdAt         DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  refundAmount      String?   @map("refund_amount")
+  refundDate        String?   @map("refund_date")
+  refundReason      String?   @map("refund_reason")
+  refundResponsible String?   @map("refund_responsible")
+  refundType        String?   @map("refund_type")
+  returnAddress     String?   @map("return_address")
+  returnTrackingNo  String?   @map("return_tracking_no")
 
   @@map("orders")
 }
 
 model FollowUp {
-  id               Int       @id @default(autoincrement())
-  memberId         Int       @map("member_id")
-  orderId          Int?      @map("order_id")
-  followUpDate     DateTime  @default(now()) @map("follow_up_date")
-  followUpType     String    @map("follow_up_type")
+  id               BigInt    @id @unique
+  memberId         BigInt?   @map("member_id")
+  orderId          BigInt?   @map("order_id")
+  followUpDate     DateTime? @map("follow_up_date") @db.Timestamptz(6)
+  followUpType     String?   @map("follow_up_type")
   content          String?
-  method           String
+  method           String?
   result           String?
-  nextFollowUpDate DateTime? @map("next_follow_up_date")
+  nextFollowUpDate String?   @map("next_follow_up_date")
   operator         String?
-  createdAt        DateTime  @default(now()) @map("created_at")
-  
-  member           Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  order            Order?    @relation(fields: [orderId], references: [id])
+  createdAt        DateTime? @map("created_at") @db.Timestamptz(6)
 
   @@map("follow_ups")
 }
 
 model AISuggestion {
-  id              String   @id @default(cuid())
-  memberId        Int      @map("member_id")
-  title           String
-  content         String
-  type            String
-  priority        String
-  reasoning       String
-  customerSegment String?  @map("customer_segment")
-  purchasePattern String?  @map("purchase_pattern")
-  riskLevel       String?  @map("risk_level")
-  potentialValue  String?  @map("potential_value")
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
-  member          Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  memberId        BigInt?   @map("member_id")
+  title           String?
+  content         String?
+  type            String?
+  priority        String?
+  reasoning       String?
+  customerSegment String?   @map("customer_segment")
+  purchasePattern String?   @map("purchase_pattern")
+  riskLevel       String?   @map("risk_level")
+  potentialValue  String?   @map("potential_value")
+  isActive        Boolean?  @map("is_active")
+  createdAt       DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([memberId, isActive])
   @@map("ai_suggestions")
 }
