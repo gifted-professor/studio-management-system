@@ -27,16 +27,16 @@ export async function GET() {
         phone: true,
         totalAmount: true,
         lastOrderDate: true,
-        orders: {
-          select: {
-            productName: true,
-            manufacturer: true
-          },
-          orderBy: {
-            paymentDate: 'desc'
-          },
-          take: 3
-        }
+        // orders: {
+        //   select: {
+        //     productName: true,
+        //     manufacturer: true
+        //   },
+        //   orderBy: {
+        //     paymentDate: 'desc'
+        //   },
+        //   take: 3
+        // }
       },
       orderBy: {
         totalAmount: 'desc'
