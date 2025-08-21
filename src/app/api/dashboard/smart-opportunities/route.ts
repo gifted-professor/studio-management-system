@@ -127,7 +127,7 @@ export async function GET() {
           data: {
             totalAmount: member.totalAmount,
             daysSinceLastOrder,
-            favoriteProducts
+            favoriteProducts: []
           }
         }
       }),
