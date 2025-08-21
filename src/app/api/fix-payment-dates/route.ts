@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         success: false, 
-        message: '修复付款日期失败：' + (error instanceof Error ? error.message : '未知错误')
+        message: '修复付款日期失败：' + (error instanceof Error ? error instanceof Error ? error.message : 'Unknown error' : '未知错误')
       },
       { status: 500 }
     )

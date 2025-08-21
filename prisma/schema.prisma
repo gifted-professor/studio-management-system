@@ -18,6 +18,7 @@ model Member {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   status         String @default("ACTIVE")
+  activityLevel  String @default("ACTIVE")
   totalOrders    Int       @default(0)
   totalAmount    Float     @default(0)
   lastOrderDate  DateTime?
@@ -26,7 +27,14 @@ model Member {
   // 关联关系
   orders         Order[]
   followUps      FollowUp[]
+  aiSuggestions  AISuggestion[]
   
+  // 索引优化
+  @@index([totalOrders, createdAt])
+  @@index([totalAmount, createdAt])
+  @@index([lastOrderDate, createdAt])
+  @@index([activityLevel])
+  @@index([name])
   @@map("members")
 }
 
@@ -88,8 +96,33 @@ model FollowUp {
   @@map("follow_ups")
 }
 
+model AISuggestion {
+  id                String    @id @default(cuid())
+  memberId          Int
+  title             String
+  content           String
+  type              String    // 'product_recommendation' | 'promotion' | 'retention' | 'upselling'
+  priority          String    // 'high' | 'medium' | 'low'
+  reasoning         String
+  customerSegment   String?   // 客户细分
+  purchasePattern   String?   // 购买模式
+  riskLevel         String?   // 流失风险
+  potentialValue    String?   // 潜在价值
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // 关联关系
+  member            Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  
+  // 索引优化
+  @@index([memberId, isActive])
+  @@map("ai_suggestions")
+}
+
 // 枚举值现在使用字符串类型存储
 // MemberStatus: "ACTIVE", "INACTIVE"
+// ActivityLevel: "HIGHLY_ACTIVE", "ACTIVE", "SLIGHTLY_INACTIVE", "MODERATELY_INACTIVE", "HEAVILY_INACTIVE", "DEEPLY_INACTIVE"
 // OrderStatus: "PENDING", "PAID", "SHIPPED", "COMPLETED", "CANCELLED"
 // FollowUpType: "PAYMENT_REMINDER", "ORDER_INQUIRY", "RETURN_INQUIRY", "GENERAL"
 // ContactMethod: "PHONE", "WECHAT", "SMS", "EMAIL"

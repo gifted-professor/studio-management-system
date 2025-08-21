@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import Link from 'next/link'
 import './globals.css'
+import Sidebar from '@/components/Sidebar'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,44 +18,19 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50">
-          <nav className="bg-white shadow-sm border-b">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between h-16">
-                <div className="flex items-center">
-                  <Link 
-                    href="/"
-                    className="text-xl font-semibold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer"
-                  >
-                    工作室管理系统
-                  </Link>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <Link 
-                    href="/members"
-                    className="text-sm text-gray-700 hover:text-blue-600 transition-colors"
-                  >
-                    会员管理
-                  </Link>
-                  <Link 
-                    href="/orders"
-                    className="text-sm text-gray-700 hover:text-blue-600 transition-colors"
-                  >
-                    订单管理
-                  </Link>
-                  <Link 
-                    href="/import"
-                    className="text-sm text-gray-700 hover:text-blue-600 transition-colors"
-                  >
-                    数据导入
-                  </Link>
-                </div>
+        <div className="min-h-screen bg-background">
+          {/* 左侧固定导航 + 右侧主内容区 */}
+          <div className="flex">
+            {/* 左侧导航栏 - 固定宽度 */}
+            <Sidebar />
+            
+            {/* 右侧主内容区 - 浅灰色背景，有呼吸感 */}
+            <main className="flex-1 ml-64 min-h-screen bg-muted/30">
+              <div className="p-6 space-y-6">
+                {children}
               </div>
-            </div>
-          </nav>
-          <main>
-            {children}
-          </main>
+            </main>
+          </div>
         </div>
       </body>
     </html>

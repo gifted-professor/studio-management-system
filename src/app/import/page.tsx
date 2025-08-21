@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Home, X } from 'lucide-react'
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Home, X, Eye, EyeOff } from 'lucide-react'
 
 interface ImportResult {
   success: boolean
@@ -29,6 +29,10 @@ export default function ImportPage() {
   const [progress, setProgress] = useState(0)
   const [progressText, setProgressText] = useState('')
   const [progressStage, setProgressStage] = useState('')
+  const [logs, setLogs] = useState<{timestamp: string, message: string, type: string}[]>([])
+  const [showLogs, setShowLogs] = useState(false)
+  const [logsExpanded, setLogsExpanded] = useState(true)
+  const logsEndRef = useRef<HTMLDivElement>(null)
 
   // 倒计时效果
   useEffect(() => {
@@ -46,6 +50,13 @@ export default function ImportPage() {
       if (timer) clearTimeout(timer)
     }
   }, [showSuccessModal, countdown, router])
+
+  // 自动滚动到日志底部
+  useEffect(() => {
+    if (logsEndRef.current && showLogs && logsExpanded) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [logs, showLogs, logsExpanded])
 
   // 处理成功弹窗的关闭
   const handleCloseSuccessModal = () => {
@@ -136,6 +147,8 @@ export default function ImportPage() {
     setProgress(0)
     setProgressText('开始处理...')
     setProgressStage('初始化')
+    setLogs([])
+    setShowLogs(true)
 
     let importResult: ImportResult | null = null
     
@@ -143,18 +156,80 @@ export default function ImportPage() {
       // 开始进度模拟
       const progressPromise = simulateProgress()
       
-      const formData = new FormData()
-      formData.append('file', file)
+      // 启动流式导入获取实时日志
+      const streamPromise = new Promise<ImportResult | null>((resolve, reject) => {
+        const formData = new FormData()
+        formData.append('file', file)
 
-      const response = await fetch('/api/import', {
-        method: 'POST',
-        body: formData,
+        fetch('/api/import/stream', {
+          method: 'POST',
+          body: formData,
+        }).then(response => {
+          if (!response.body) {
+            reject(new Error('No response body'))
+            return
+          }
+
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
+          let finalResult: ImportResult | null = null
+
+          const readStream = () => {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                resolve(finalResult)
+                return
+              }
+
+              const chunk = decoder.decode(value, { stream: true })
+              const lines = chunk.split('\n')
+              
+              lines.forEach(line => {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const logEntry = JSON.parse(line.slice(6))
+                    
+                    // 检查是否是最终结果
+                    if (logEntry.message.startsWith('FINAL_RESULT:')) {
+                      const resultData = logEntry.message.replace('FINAL_RESULT:', '')
+                      finalResult = JSON.parse(resultData)
+                    } else {
+                      setLogs(prevLogs => [...prevLogs, logEntry])
+                    }
+                  } catch (error) {
+                    console.error('解析SSE数据失败:', error, line)
+                  }
+                }
+              })
+
+              readStream()
+            }).catch(error => {
+              console.error('读取流失败:', error)
+              reject(error)
+            })
+          }
+
+          readStream()
+        }).catch(error => {
+          console.error('启动流失败:', error)
+          reject(error)
+        })
       })
-
-      // 等待进度模拟完成或API响应完成
-      await Promise.all([progressPromise, response])
       
-      importResult = await response.json()
+      // 等待进度模拟和流式导入完成
+      const [_, streamResult] = await Promise.all([progressPromise, streamPromise])
+      
+      importResult = streamResult || {
+        success: false,
+        message: '导入失败：未收到结果',
+        data: {
+          newMembers: 0,
+          newOrders: 0,
+          duplicateMembers: 0,
+          duplicateOrders: 0,
+          totalProcessed: 0
+        }
+      }
       
       // 根据结果设置最终进度状态
       if (importResult?.success) {
@@ -384,6 +459,41 @@ export default function ImportPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 实时日志显示 */}
+      {showLogs && logs.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">导入日志</h3>
+            <button
+              onClick={() => setLogsExpanded(!logsExpanded)}
+              className="flex items-center text-sm text-blue-600 hover:text-blue-500"
+            >
+              {logsExpanded ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+              {logsExpanded ? '隐藏日志' : '显示日志'}
+            </button>
+          </div>
+          
+          {logsExpanded && (
+            <div className="bg-gray-900 text-green-400 p-4 rounded-lg max-h-80 overflow-y-auto font-mono text-sm">
+              {logs.map((log, index) => (
+                <div key={index} className={`mb-1 ${
+                  log.type === 'error' ? 'text-red-400' : 
+                  log.type === 'success' ? 'text-green-400' : 
+                  log.type === 'progress' ? 'text-blue-400' : 
+                  'text-gray-300'
+                }`}>
+                  <span className="text-gray-500 text-xs mr-2">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                  {log.message}
+                </div>
+              ))}
+              <div ref={logsEndRef} />
+            </div>
+          )}
         </div>
       )}
 

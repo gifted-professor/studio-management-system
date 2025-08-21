@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import AISuggestions from "@/components/AISuggestions";
 
 interface Order {
   id: number;
@@ -303,6 +304,11 @@ export default function MemberDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* AI 促单建议 */}
+      <div className="mb-6">
+        <AISuggestions memberId={member.id} />
       </div>
 
       {/* 订单列表 */}

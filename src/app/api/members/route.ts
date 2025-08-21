@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { memoryCache } from '@/lib/cache'
 
 // 获取所有会员
 export async function GET(request: NextRequest) {
@@ -10,6 +11,21 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const sortBy = searchParams.get('sortBy') || 'totalOrders'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const activityLevel = searchParams.get('activityLevel') || ''
+    const daysSinceOrder = searchParams.get('daysSinceOrder') || ''
+    const platform = searchParams.get('platform') || ''
+
+    // 生成缓存键
+    const cacheKey = `members:${page}:${limit}:${search}:${sortBy}:${sortOrder}:${activityLevel}:${daysSinceOrder}:${platform}`
+    
+    // 尝试从缓存获取数据（仅当没有搜索时缓存）
+    if (!search) {
+      const cachedData = memoryCache.get(cacheKey)
+      if (cachedData) {
+        console.log('从缓存返回会员数据')
+        return NextResponse.json(cachedData)
+      }
+    }
 
     const skip = (page - 1) * limit
 
@@ -37,21 +53,165 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    const where = search
-      ? {
+    // 构建查询条件
+    const where: any = {
+      totalOrders: { gt: 0 } // 只显示有订单的会员
+    }
+    
+    // 构建AND条件数组
+    const andConditions: any[] = []
+    
+    if (search) {
+      andConditions.push({
+        OR: [
+          { name: { contains: search } },
+          { phone: { contains: search } },
+        ]
+      })
+    }
+    
+    if (activityLevel) {
+      // 根据新的时间范围定义来筛选
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      
+      if (activityLevel === 'ACTIVE') {
+        // 活跃：50天内有下单
+        const fiftyDaysAgo = new Date(today)
+        fiftyDaysAgo.setDate(fiftyDaysAgo.getDate() - 50)
+        andConditions.push({
+          lastOrderDate: {
+            gte: fiftyDaysAgo,
+            not: null
+          }
+        })
+      } else if (activityLevel === 'SLIGHTLY_INACTIVE') {
+        // 轻度流失：大于50天小于90天
+        const fiftyDaysAgo = new Date(today)
+        const ninetyDaysAgo = new Date(today)
+        fiftyDaysAgo.setDate(fiftyDaysAgo.getDate() - 50)
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+        andConditions.push({
+          lastOrderDate: {
+            lt: fiftyDaysAgo,
+            gte: ninetyDaysAgo,
+            not: null
+          }
+        })
+      } else if (activityLevel === 'HEAVILY_INACTIVE') {
+        // 重度流失：大于90天
+        const ninetyDaysAgo = new Date(today)
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+        andConditions.push({
           OR: [
-            { name: { contains: search } },
-            { phone: { contains: search } },
-          ],
+            {
+              lastOrderDate: {
+                lt: ninetyDaysAgo,
+                not: null
+              }
+            },
+            {
+              lastOrderDate: null
+            }
+          ]
+        })
+      }
+    }
+    
+    // 处理基于下单时间的筛选
+    if (daysSinceOrder) {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      
+      if (daysSinceOrder === 'active') {
+        // 活跃用户：最近7天内下单
+        const sevenDaysAgo = new Date(today)
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        andConditions.push({
+          lastOrderDate: {
+            gte: sevenDaysAgo,
+            not: null
+          }
+        })
+      } else if (daysSinceOrder === 'recent') {
+        // 近期客户：8-30天前下单
+        const thirtyDaysAgo = new Date(today)
+        const eightDaysAgo = new Date(today)
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        eightDaysAgo.setDate(eightDaysAgo.getDate() - 7)
+        andConditions.push({
+          lastOrderDate: {
+            gte: thirtyDaysAgo,
+            lt: eightDaysAgo,
+            not: null
+          }
+        })
+      } else if (daysSinceOrder === 'promotion') {
+        // 促单目标：31-90天前下单
+        const ninetyDaysAgo = new Date(today)
+        const thirtyOneDaysAgo = new Date(today)
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+        thirtyOneDaysAgo.setDate(thirtyOneDaysAgo.getDate() - 30)
+        andConditions.push({
+          lastOrderDate: {
+            gte: ninetyDaysAgo,
+            lt: thirtyOneDaysAgo,
+            not: null
+          }
+        })
+      } else if (daysSinceOrder === 'care') {
+        // 重点关怀：90天前下单 或 从未下单
+        const ninetyDaysAgo = new Date(today)
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+        andConditions.push({
+          OR: [
+            {
+              lastOrderDate: {
+                lt: ninetyDaysAgo,
+                not: null
+              }
+            },
+            {
+              lastOrderDate: null
+            }
+          ]
+        })
+      }
+    }
+    
+    // 处理按出售平台的筛选
+    if (platform) {
+      andConditions.push({
+        orders: {
+          some: {
+            platform: platform
+          }
         }
-      : {}
+      })
+    }
+    
+    // 如果有AND条件，将它们合并到where子句中
+    if (andConditions.length > 0) {
+      where.AND = andConditions
+    }
 
-    const [members, total] = await Promise.all([
+    const [members, total, platforms] = await Promise.all([
       prisma.member.findMany({
         where,
         skip,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          address: true,
+          status: true,
+          activityLevel: true,
+          totalOrders: true,
+          totalAmount: true,
+          lastOrderDate: true,
+          returnRate: true,
+          createdAt: true,
           _count: {
             select: { orders: true }
           }
@@ -59,9 +219,35 @@ export async function GET(request: NextRequest) {
         orderBy,
       }),
       prisma.member.count({ where }),
+      // 获取平台及其订单数量，只显示订单量≥10的平台
+      prisma.order.groupBy({
+        by: ['platform'],
+        where: {
+          platform: { 
+            not: null,
+            notIn: ['五店', '三店', '代发', 'pdd', '样品'] // 过滤掉指定平台
+          }
+        },
+        _count: {
+          platform: true
+        },
+        having: {
+          platform: {
+            _count: {
+              gte: 10
+            }
+          }
+        }
+      })
     ])
 
-    return NextResponse.json({
+    // 提取符合条件的平台名称并排序
+    const availablePlatforms = platforms
+      .map(item => item.platform)
+      .filter(Boolean)
+      .sort()
+
+    const response = {
       members,
       pagination: {
         page,
@@ -69,7 +255,15 @@ export async function GET(request: NextRequest) {
         total,
         pages: Math.ceil(total / limit),
       },
-    })
+      platforms: availablePlatforms,
+    }
+
+    // 缓存响应数据（仅当没有搜索时缓存）
+    if (!search) {
+      memoryCache.set(cacheKey, response, 2 * 60 * 1000) // 缓存2分钟
+    }
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('获取会员列表失败:', error)
     return NextResponse.json(
