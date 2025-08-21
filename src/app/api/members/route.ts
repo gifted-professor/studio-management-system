@@ -277,9 +277,6 @@ export async function GET(request: NextRequest) {
           lastOrderDate: true,
           returnRate: true,
           createdAt: true,
-          _count: {
-            select: { orders: true }
-          }
         },
         orderBy,
       }),

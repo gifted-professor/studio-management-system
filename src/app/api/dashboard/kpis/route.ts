@@ -23,7 +23,7 @@ export async function GET() {
           gte: monthStart
         },
         nextFollowUpDate: {
-          gte: now // 还有未来的跟进计划
+          not: null // 有跟进计划
         }
       }
     })
