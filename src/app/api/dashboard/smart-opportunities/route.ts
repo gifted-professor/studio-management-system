@@ -58,23 +58,7 @@ export async function GET() {
         id: true,
         name: true,
         phone: true,
-        totalAmount: true,
-        orders: {
-          where: {
-            paymentDate: {
-              gte: thirtyDaysAgo
-            }
-          },
-          select: {
-            productName: true,
-            manufacturer: true,
-            amount: true
-          },
-          orderBy: {
-            paymentDate: 'desc'
-          },
-          take: 5
-        }
+        totalAmount: true
       },
       take: 10
     })
@@ -116,16 +100,16 @@ export async function GET() {
         const favoriteText = '' // 暂时不显示偏好产品
 
         return {
-          id: `dormant_${member.id}`,
+          id: `dormant_${member.id.toString()}`,
           type: 'dormant_high_value' as const,
-          memberId: member.id,
+          memberId: member.id.toString(),
           memberName: member.name,
-          memberPhone: member.phone || '未填写',
-          message: `高价值客户，累计消费¥${Math.round(member.totalAmount)}，已超过${daysSinceLastOrder}天未下单${favoriteText}，建议主动关怀`,
+          memberPhone: member.phone ? member.phone.toString() : '未填写',
+          message: `高价值客户，累计消费¥${member.totalAmount ? member.totalAmount.toString() : '0'}，已超过${daysSinceLastOrder}天未下单${favoriteText}，建议主动关怀`,
           urgency: daysSinceLastOrder > 60 ? 'high' as const : 'medium' as const,
           actionButton: '立即联系',
           data: {
-            totalAmount: member.totalAmount,
+            totalAmount: member.totalAmount ? member.totalAmount.toString() : '0',
             daysSinceLastOrder,
             favoriteProducts: []
           }
@@ -134,40 +118,38 @@ export async function GET() {
 
       // 交叉销售机会
       ...crossSellOpportunities.slice(0, 3).map(member => {
-        const brands = Array.from(new Set(member.orders.map(o => o.manufacturer).filter(Boolean)))
-        const avgAmount = member.orders.reduce((sum, o) => sum + (o.amount || 0), 0) / member.orders.length
-
         return {
-          id: `cross_sell_${member.id}`,
+          id: `cross_sell_${member.id.toString()}`,
           type: 'cross_sell' as const,
-          memberId: member.id,
+          memberId: member.id.toString(),
           memberName: member.name,
-          memberPhone: member.phone || '未填写',
-          message: `近期购买了${brands[0] || '品牌'}商品，平均单价¥${Math.round(avgAmount)}，可推荐同系列其他产品`,
+          memberPhone: member.phone ? member.phone.toString() : '未填写',
+          message: `活跃客户，累计消费¥${member.totalAmount ? member.totalAmount.toString() : '0'}，可推荐新品或搭配产品`,
           urgency: 'medium' as const,
           actionButton: '推荐搭配',
           data: {
-            recentBrands: brands,
-            avgAmount
+            recentBrands: [],
+            avgAmount: 0
           }
         }
       }),
 
       // VIP升级机会
       ...vipUpgradeOpportunities.map(member => {
-        const remaining = 5000 - member.totalAmount
+        const totalAmount = member.totalAmount ? Number(member.totalAmount.toString()) : 0
+        const remaining = 5000 - totalAmount
 
         return {
-          id: `vip_upgrade_${member.id}`,
+          id: `vip_upgrade_${member.id.toString()}`,
           type: 'vip_upgrade' as const,
-          memberId: member.id,
+          memberId: member.id.toString(),
           memberName: member.name,
-          memberPhone: member.phone || '未填写',
-          message: `累计消费¥${Math.round(member.totalAmount)}，距离VIP还差¥${Math.round(remaining)}，可提醒升级享受折扣`,
+          memberPhone: member.phone ? member.phone.toString() : '未填写',
+          message: `累计消费¥${totalAmount}，距离VIP还差¥${Math.round(remaining)}，可提醒升级享受折扣`,
           urgency: remaining < 500 ? 'high' as const : 'medium' as const,
           actionButton: '升级提醒',
           data: {
-            currentAmount: member.totalAmount,
+            currentAmount: totalAmount,
             remaining
           }
         }

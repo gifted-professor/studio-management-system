@@ -12,28 +12,18 @@ export async function GET() {
     const todayTasks = await prisma.followUp.findMany({
       where: {
         nextFollowUpDate: {
-          gte: todayStart,
-          lt: todayEnd
+          gte: todayStart.toISOString().split('T')[0],
+          lt: todayEnd.toISOString().split('T')[0]
         }
       },
-      include: {
-        member: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            totalAmount: true,
-            lastOrderDate: true
-          }
-        },
-        order: {
-          select: {
-            id: true,
-            productName: true,
-            amount: true,
-            paymentDate: true
-          }
-        }
+      select: {
+        id: true,
+        memberId: true,
+        orderId: true,
+        followUpType: true,
+        content: true,
+        nextFollowUpDate: true,
+        operator: true
       },
       orderBy: {
         nextFollowUpDate: 'asc'
@@ -41,24 +31,57 @@ export async function GET() {
       take: 20 // 限制显示数量
     })
 
+    // 获取相关会员和订单信息
+    const memberIds = Array.from(new Set(todayTasks.map(task => task.memberId).filter(Boolean)))
+    const orderIds = Array.from(new Set(todayTasks.map(task => task.orderId).filter(Boolean)))
+    
+    const members = await prisma.member.findMany({
+      where: { id: { in: memberIds } },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        totalAmount: true,
+        lastOrderDate: true
+      }
+    })
+    
+    const orders = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: {
+        id: true,
+        productName: true,
+        amount: true,
+        paymentDate: true
+      }
+    })
+    
+    const memberMap = new Map(members.map(m => [m.id, m]))
+    const orderMap = new Map(orders.map(o => [o.id, o]))
+
     // 格式化数据
-    const formattedTasks = todayTasks.map(task => ({
-      id: task.id,
-      memberId: task.member.id,
-      memberName: task.member.name,
-      memberPhone: task.member.phone || '未填写',
-      followUpType: task.followUpType,
-      content: task.content || '常规跟进',
-      lastOrderDate: task.member.lastOrderDate?.toISOString().split('T')[0],
-      totalAmount: Math.round(task.member.totalAmount),
-      orderInfo: task.order ? {
-        productName: task.order.productName,
-        amount: task.order.amount,
-        paymentDate: task.order.paymentDate?.toISOString().split('T')[0]
-      } : null,
-      scheduledTime: task.nextFollowUpDate?.toISOString(),
-      operator: task.operator
-    }))
+    const formattedTasks = todayTasks.map(task => {
+      const member = memberMap.get(task.memberId!)
+      const order = orderMap.get(task.orderId!)
+      
+      return {
+        id: task.id,
+        memberId: task.memberId,
+        memberName: member?.name || '未知',
+        memberPhone: member?.phone?.toString() || '未填写',
+        followUpType: task.followUpType,
+        content: task.content || '常规跟进',
+        lastOrderDate: member?.lastOrderDate?.toISOString().split('T')[0],
+        totalAmount: member?.totalAmount ? Number(member.totalAmount) : 0,
+        orderInfo: order ? {
+          productName: order.productName,
+          amount: order.amount,
+          paymentDate: order.paymentDate?.toISOString().split('T')[0]
+        } : null,
+        scheduledTime: task.nextFollowUpDate,
+        operator: task.operator
+      }
+    })
 
     return NextResponse.json({
       success: true,
